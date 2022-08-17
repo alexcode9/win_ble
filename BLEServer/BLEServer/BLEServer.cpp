@@ -113,7 +113,7 @@ concurrency::task<IJsonValue^> connectRequest(JsonObject ^command) {
 			devices->Remove(device->DeviceId);
 		}
 	});
-	return JsonValue::CreateStringValue(device->DeviceId);
+	co_return JsonValue::CreateStringValue(device->DeviceId);
 }
 
 auto CustomOnPairingRequested = ref new Windows::Foundation::TypedEventHandler<Enumeration::DeviceInformationCustomPairing^, Enumeration::DevicePairingRequestedEventArgs^>
@@ -140,7 +140,7 @@ concurrency::task<IJsonValue^> pairRequest(JsonObject^ command) {
 
 	bool isPaired = device->DeviceInformation->Pairing->IsPaired;
 
-	return JsonValue::CreateStringValue(result->Status.ToString());
+	co_return JsonValue::CreateStringValue(result->Status.ToString());
 }
 
 JsonValue^ canPair(JsonObject^ command) {
@@ -178,7 +178,7 @@ concurrency::task<IJsonValue^> unPairRequest(JsonObject^ command) {
 	bool canPair = device->DeviceInformation->Pairing->CanPair;
 	bool isPaired = device->DeviceInformation->Pairing->IsPaired;
 
-	return JsonValue::CreateStringValue(result->Status.ToString());
+	co_return JsonValue::CreateStringValue(result->Status.ToString());
 }
 
 Concurrency::task<IJsonValue^> disconnectRequest(JsonObject ^command) {
@@ -233,7 +233,7 @@ concurrency::task<Bluetooth::GenericAttributeProfile::GattDeviceServicesResult^>
 		return co_await device->GetGattServicesForUuidAsync(parseUuid(command->GetNamedString("service")));
 	}
 	else {
-		return co_await device->GetGattServicesAsync();
+		co_return co_await device->GetGattServicesAsync();
 	}
 }
 
@@ -266,7 +266,7 @@ concurrency::task<Bluetooth::GenericAttributeProfile::GattCharacteristicsResult^
 		auto key = characteristicKey(command->GetNamedString("device"), command->GetNamedString("service"), characteristic->Uuid.ToString());
 		characteristicsMap->Insert(key, characteristic);
 	}
-	return results;
+	co_return results;
 }
 
 concurrency::task<Bluetooth::GenericAttributeProfile::GattCharacteristic^> getCharacteristic(JsonObject ^command) {
@@ -280,7 +280,7 @@ concurrency::task<Bluetooth::GenericAttributeProfile::GattCharacteristic^> getCh
 	}
 
 	if (characteristicsMap->HasKey(key)) {
-		return characteristicsMap->Lookup(key);
+		co_return characteristicsMap->Lookup(key);
 	}
 
 	throw ref new FailureException(ref new String(L"Requested characteristic not found"));
@@ -292,7 +292,7 @@ concurrency::task<IJsonValue^> servicesRequest(JsonObject ^command) {
 	for (unsigned int i = 0; i < servicesResult->Services->Size; i++) {
 		result->Append(JsonValue::CreateStringValue(servicesResult->Services->GetAt(i)->Uuid.ToString()));
 	}
-	return result;
+	co_return result;
 }
 
 concurrency::task<IJsonValue^> charactersticsRequest(JsonObject ^command) {
@@ -316,7 +316,7 @@ concurrency::task<IJsonValue^> charactersticsRequest(JsonObject ^command) {
 		characteristicJson->SetNamedValue("properties", properties);
 		result->Append(characteristicJson);
 	}
-	return result;
+	co_return result;
 }
 
 concurrency::task<IJsonValue^> readRequest(JsonObject ^command) {
@@ -330,7 +330,7 @@ concurrency::task<IJsonValue^> readRequest(JsonObject ^command) {
 	for (unsigned int i = 0; i < result->Value->Length; i++) {
 		valueArray->Append(JsonValue::CreateNumberValue(reader->ReadByte()));
 	}
-	return valueArray;
+	co_return valueArray;
 }
 
 concurrency::task<IJsonValue^> writeRequest(JsonObject ^command) {
@@ -349,7 +349,7 @@ concurrency::task<IJsonValue^> writeRequest(JsonObject ^command) {
 		throw ref new FailureException(status.ToString());
 	}
 
-	return JsonValue::CreateNullValue();
+	co_return JsonValue::CreateNullValue();
 }
 
 unsigned long nextSubscriptionId = 1;
@@ -379,7 +379,9 @@ concurrency::task<IJsonValue^> subscribeRequest(JsonObject ^command) {
 
 	auto key = characteristicKey(command);
 	if (characteristicsSubscriptionMap->HasKey(key)) {
-		return characteristicsSubscriptionMap->Lookup(key);
+		characteristicsListenerMap->Remove(key);
+		characteristicsSubscriptionMap->Remove(key);
+		// co_return characteristicsSubscriptionMap->Lookup(key);
 	}
 
 	auto subscriptionId = JsonValue::CreateNumberValue(nextSubscriptionId++);
@@ -402,7 +404,7 @@ concurrency::task<IJsonValue^> subscribeRequest(JsonObject ^command) {
 	characteristicsListenerMap->Insert(key, cookie);
 	characteristicsSubscriptionMap->Insert(key, subscriptionId);
 
-	return subscriptionId;
+	co_return subscriptionId;
 }
 
 concurrency::task<IJsonValue^> unsubscribeRequest(JsonObject ^command) {
@@ -425,7 +427,7 @@ concurrency::task<IJsonValue^> unsubscribeRequest(JsonObject ^command) {
 	characteristicsListenerMap->Remove(key);
 	characteristicsSubscriptionMap->Remove(key);
 
-	return subscriptionId;
+	co_return subscriptionId;
 }
 
 concurrency::task<void> processCommand(JsonObject ^command) {

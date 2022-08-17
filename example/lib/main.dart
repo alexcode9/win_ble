@@ -57,16 +57,19 @@ class _MyAppState extends State<MyApp> {
 
   /// Main Methods
   startScanning() {
-    // if (bleState != BleState.On) {
-    //   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-    //       content: Text("Please Check your Bluetooth , State : $bleState"),
-    //       backgroundColor: Colors.red,
-    //       duration: const Duration(seconds: 1)));
-    //   return;
-    // }
     WinBle.startScanning();
-    setState(() {
-      isScanning = true;
+    scanStream = WinBle.scanStream.listen((event) {
+      setState(() {
+        if (!devices.any((element) => element.address == event.address)) {
+          devices.add(event);
+        } else {
+          int index =
+              devices.indexWhere((element) => element.address == event.address);
+          if (index != -1) {
+            devices[index] = event;
+          }
+        }
+      });
     });
   }
 
